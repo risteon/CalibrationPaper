@@ -55,13 +55,11 @@ using LibGit2
 #' First we check if the predictions and labels are already extracted.
 
 # create directory for results
-const DATADIR = joinpath(@__DIR__, "..", "data", "PyTorch-CIFAR10")
+const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI")
 isdir(DATADIR) || mkpath(DATADIR)
 
 # check if predictions exist
-const ALL_MODELS = ["densenet121", "densenet161", "densenet169", "googlenet", "inception_v3",
-                    "mobilenet_v2", "resnet_orig", "resnet18", "resnet34", "resnet50",
-                    "vgg11_bn", "vgg13_bn", "vgg16_bn", "vgg19_bn"]
+const ALL_MODELS = ["upgrade_v1_c000054", ]
 const MISSING_MODELS = filter(ALL_MODELS) do name
     !isfile(joinpath(DATADIR, "$name.csv"))
 end
