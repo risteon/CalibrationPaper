@@ -120,7 +120,7 @@ const LABELS = labels
         ECE_uniform = ece_uniform,
         ECE_dynamic = ece_dynamic,
         # SKCEb_median = skceb_median,
-        SKCEuq_median = skceuq_median,
+        # SKCEuq_median = skceuq_median,
         SKCEul_median = skceul_median
     )
 end
