@@ -55,113 +55,38 @@ using LibGit2
 #' First we check if the predictions and labels are already extracted.
 
 # create directory for results
-const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI")
+const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_01")
 isdir(DATADIR) || mkpath(DATADIR)
 
 # check if predictions exist
 const ALL_MODELS = ["upgrade_v1_c000054", ]
 const MISSING_MODELS = filter(ALL_MODELS) do name
-    !isfile(joinpath(DATADIR, "$name.csv"))
+    !isfile(joinpath(DATADIR, "$name.bin"))
 end
 
 #' If the data does not exist, we start by loading all missing packages and
 #' registering the required data. If you want to rerun this experiment from
 #' scratch, please download the pretrained weights of the models.
 
-if !isempty(MISSING_MODELS) || !isfile(joinpath(DATADIR, "labels.csv"))   
-    # register the data source for the pretrained models
-    register(ManualDataDep(
-        "PyTorch-CIFAR10",
-        """
-        Please go to
-            https://drive.google.com/drive/folders/15jBlLkOFg0eK-pwsmXoSesNDyDb_HOeV
-        and download the pretrained weights.
-        Note that this must be done manually since Google requires to confirm the download of
-        large files and I have not automated the confirmation process (yet).
-        """
-    ))
-
-    # install PyTorch
-    Conda.add("cpuonly=1.0"; channel = "pytorch")
-    Conda.add("pytorch=1.3.0"; channel = "pytorch")
-    Conda.add("torchvision=0.4.1"; channel = "pytorch")
-
-    mktempdir() do dir
-        # clone the repository
-        repodir = mkdir(joinpath(dir, "PyTorch-CIFAR10"))
-        LibGit2.clone("https://github.com/huyvnphan/PyTorch-CIFAR10.git", repodir)
-        LibGit2.checkout!(LibGit2.GitRepo(repodir), "90325333f4da099b3a795693cfa18e64490dffe9")
-
-        # copy pretrained weights to the correct directory
-        weightsdir = joinpath(repodir, "models", "state_dicts")
-        for name in MISSING_MODELS
-            cp(joinpath(datadep"PyTorch-CIFAR10", "$name.pt"), joinpath(weightsdir, "$name.pt"))
-        end
-
-        # load Python packages
-        torch = pyimport("torch")
-        F = pyimport("torch.nn.functional")
-        torchvision = pyimport("torchvision")
-        transforms = pyimport("torchvision.transforms")
-
-        # import local models
-        pushfirst!(PyVector(pyimport("sys")."path"), repodir)
-        models = pyimport("models")
-
-        # define transformation
-        transform = transforms.Compose([transforms.ToTensor(),
-                                        transforms.Normalize([0.4914, 0.4822, 0.4465],
-                                                             [0.2023, 0.1994, 0.2010])])
-
-        # download CIFAR-10 validation data set
-        dataset = torchvision.datasets.CIFAR10(root=joinpath(dir, "CIFAR10"), train=false,
-                                               transform=transform, download=true)
-
-        # extract and save labels
-        if !isfile(joinpath(DATADIR, "labels.csv"))
-            @info "extracting labels..."
-
-            # extract labels of the validation data set
-            _, labels_py = iterate(torch.utils.data.DataLoader(dataset, batch_size=10_000, shuffle=false))[1]
-
-            # save labels (+1 since we need classes 1,...,n)
-            labels = pycall(labels_py."numpy", PyArray) .+ 1
-            writedlm(joinpath(datadir, "labels.csv"), labels)
-        end
-
-        # extract predictions
-        if !isempty(MISSING_MODELS)
-            # create data loader with batches of 250 images
-            dataloader = torch.utils.data.DataLoader(dataset, batch_size=250, shuffle=false)
-
-            cd(repodir) do
-                @pywith torch.no_grad() begin
-                    for name in MISSING_MODELS
-                        @info "extracting predictions of model $name..."
-
-                        # load model with pretrained weights
-                        model = getproperty(models, name)(pretrained=true)
-
-                        # save all predictions
-                        open(joinpath(DATADIR, "$name.csv"), "w") do f
-                            for (images_py, _) in dataloader
-                                predictions = pycall(F.softmax(model(images_py), dim=1)."numpy", PyArray)
-                                writedlm(f, predictions, ',')
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        nothing
-    end
+if !isempty(MISSING_MODELS) || !isfile(joinpath(DATADIR, "labels.bin"))   
+    throw(ArgumentError("Missing labels file."))
 end
+
+# throw(ArgumentError("Ending here."))
 
 #' We load the true labels since they are the same for every model.
 
-const LABELS = CSV.read(joinpath(DATADIR, "labels.csv");
-    header = false, delim = ',', type = Int) |> Matrix{Int} |> vec
+labels = Array{UInt8}(undef, 2313196);
+read!(joinpath(DATADIR, "labels.bin"), labels) # read data
+println(size(labels))
+println(length(labels))
+
+const LABELS = labels
+println("Max")
+println(maximum(LABELS))
+
+# const LABELS = CSV.read(joinpath(DATADIR, "labels.csv");
+#     header = false, delim = ',', type = Int) |> Matrix{Int} |> vec
 
 #' ## Calibration error estimates
 #'
@@ -178,6 +103,9 @@ const LABELS = CSV.read(joinpath(DATADIR, "labels.csv");
     put!(channel, true)
     ece_dynamic = calibrationerror(ECE(MedianVarianceBinning(100)), predictions, labels)
     put!(channel, true)
+
+    ece_uniform = 0.0
+    ece_dynamic = 0.0
 
     # compute kernel based on the median heuristic
     kernel = median_TV_kernel(predictions)
@@ -220,14 +148,38 @@ else
         estimates = let rng = Random.GLOBAL_RNG, datadir = DATADIR, labels = LABELS, channel = channel
             pmap(wp, ALL_MODELS) do model
                 # load predictions
-                rawdata = CSV.read(joinpath(datadir, "$model.csv");
-                                   header = false, transpose = true, delim = ',',
-                                   type = Float64) |> Matrix{Float64}
-                predictions = [rawdata[:, i] for i in axes(rawdata, 2)]
+                rawdata = Array{Float16}(undef, 2313196, 20);
+                read!(joinpath(datadir, "$model.bin"), rawdata) # read data
+
+                
+
+                # rawdata = CSV.read(joinpath(datadir, "$model.csv");
+                #                    header = false, transpose = true, delim = ',',
+                #                    type = Float64) |> Matrix{Float64}
+
+                # println(size(rawdata))
+                # println(length(rawdata))
+                # predictions = [rawdata[:, i] for i in axes(rawdata, 2)]
+
+                println(axes(rawdata, 1))
+                println(size(rawdata))
+                rawdata = reshape(rawdata, 2313196 * 20)
+                rawdata = resize!(rawdata, 10000 * 20)
+                rawdata = reshape(rawdata, :, 20)
+
+                predictions = [convert(Array{Float64}, rawdata[i, :]) for i in axes(rawdata, 1)]
+                println(length(predictions))
+
+                println(size(rawdata))
+                println(length(rawdata))
+                println(maximum(rawdata))
+                println(minimum(rawdata))
 
                 # copy random number generator and set seed
                 _rng = deepcopy(rng)
                 Random.seed!(_rng, 1234)
+
+                labels = resize!(labels, 10000)
 
                 # compute approximations
                 errors = calibration_errors(_rng, predictions, labels, channel)
@@ -243,53 +195,53 @@ else
     CSV.write(joinpath(DATADIR, "errors.csv"), estimates)
 end
 
-#' ## Calibration tests
-#'
-#' Additionally we compute different p-value approximations for each model. More concretely,
-#' we estimate the p-value by consistency resampling of the two ECE estimators mentioned
-#' above, by distribution-free bounds of the three SKCE estimators discussed above, and by
-#' the asymptotic approximations for the unbiased quadratic and linear SKCE estimators
-#' used above. The results are saved in a CSV file `pvalues.csv`.
+# ' ## Calibration tests
+# '
+# ' Additionally we compute different p-value approximations for each model. More concretely,
+# ' we estimate the p-value by consistency resampling of the two ECE estimators mentioned
+# ' above, by distribution-free bounds of the three SKCE estimators discussed above, and by
+# ' the asymptotic approximations for the unbiased quadratic and linear SKCE estimators
+# ' used above. The results are saved in a CSV file `pvalues.csv`.
 
 @everywhere function calibration_pvalues(rng::AbstractRNG, predictions, labels, channel)
     # evaluate consistency resampling based estimators
-    ece_uniform = ConsistencyTest(ECE(UniformBinning(10)), predictions, labels)
-    pvalue_ece_uniform = pvalue(ece_uniform; rng = rng)
+    # ece_uniform = ConsistencyTest(ECE(UniformBinning(10)), predictions, labels)
+    # pvalue_ece_uniform = pvalue(ece_uniform; rng = rng)
     put!(channel, true)
-    ece_dynamic = ConsistencyTest(ECE(MedianVarianceBinning(100)), predictions, labels)
-    pvalue_ece_dynamic = pvalue(ece_dynamic; rng = rng)
+    # ece_dynamic = ConsistencyTest(ECE(MedianVarianceBinning(100)), predictions, labels)
+    # pvalue_ece_dynamic = pvalue(ece_dynamic; rng = rng)
     put!(channel, true)
 
     # compute kernel based on the median heuristic
     kernel = median_TV_kernel(predictions)
 
     # evaluate distribution-free bounds
-    skceb_median_distribution_free = DistributionFreeTest(BiasedSKCE(kernel), predictions, labels)
-    pvalue_skceb_median_distribution_free = pvalue(skceb_median_distribution_free)
+    # skceb_median_distribution_free = DistributionFreeTest(BiasedSKCE(kernel), predictions, labels)
+    # pvalue_skceb_median_distribution_free = pvalue(skceb_median_distribution_free)
     put!(channel, true)
-    skceuq_median_distribution_free = DistributionFreeTest(QuadraticUnbiasedSKCE(kernel), predictions, labels)
-    pvalue_skceuq_median_distribution_free = pvalue(skceuq_median_distribution_free)
+    # skceuq_median_distribution_free = DistributionFreeTest(QuadraticUnbiasedSKCE(kernel), predictions, labels)
+    # pvalue_skceuq_median_distribution_free = pvalue(skceuq_median_distribution_free)
     put!(channel, true)
-    skceul_median_distribution_free = DistributionFreeTest(LinearUnbiasedSKCE(kernel), predictions, labels)
-    pvalue_skceul_median_distribution_free = pvalue(skceul_median_distribution_free)
+    # skceul_median_distribution_free = DistributionFreeTest(LinearUnbiasedSKCE(kernel), predictions, labels)
+    # pvalue_skceul_median_distribution_free = pvalue(skceul_median_distribution_free)
     put!(channel, true)
 
     # evaluate asymptotic bounds
-    skceuq_median_asymptotic = AsymptoticQuadraticTest(kernel, predictions, labels)
-    pvalue_skceuq_median_asymptotic = pvalue(skceuq_median_asymptotic; rng = rng)
+    # skceuq_median_asymptotic = AsymptoticQuadraticTest(kernel, predictions, labels)
+    # pvalue_skceuq_median_asymptotic = pvalue(skceuq_median_asymptotic; rng = rng)
     put!(channel, true)
     skceul_median_asymptotic = AsymptoticLinearTest(kernel, predictions, labels)
     pvalue_skceul_median_asymptotic = pvalue(skceul_median_asymptotic)
     put!(channel, true)
 
     (
-        ECE_uniform = pvalue_ece_uniform,
-        ECE_dynamic = pvalue_ece_dynamic,
-        SKCEb_median_distribution_free = pvalue_skceb_median_distribution_free,
-        SKCEuq_median_distribution_free = pvalue_skceuq_median_distribution_free,
-        SKCEul_median_distribution_free = pvalue_skceul_median_distribution_free,
-        SKCEuq_median_asymptotic = pvalue_skceuq_median_asymptotic,
-        SKCEul_median_asymptotic = pvalue_skceul_median_asymptotic
+        # ECE_uniform = pvalue_ece_uniform,
+        # ECE_dynamic = pvalue_ece_dynamic,
+        # SKCEb_median_distribution_free = pvalue_skceb_median_distribution_free,
+        # SKCEuq_median_distribution_free = pvalue_skceuq_median_distribution_free,
+        # SKCEul_median_distribution_free = pvalue_skceul_median_distribution_free,
+        # SKCEuq_median_asymptotic = pvalue_skceuq_median_asymptotic,
+        SKCEul_median_asymptotic = pvalue_skceul_median_asymptotic,
     )
 end
 
@@ -313,15 +265,27 @@ else
         # compute the p-value approximations for all models
         estimates = let rng = Random.GLOBAL_RNG, datadir = DATADIR, labels = LABELS, channel = channel
             pmap(wp, ALL_MODELS) do model
+                # # load predictions
+                # rawdata = CSV.read(joinpath(datadir, "$model.csv");
+                #                    header = false, transpose = true, delim = ',',
+                #                    type = Float64) |> Matrix{Float64}
+                # predictions = [rawdata[:, i] for i in axes(rawdata, 2)]
+
                 # load predictions
-                rawdata = CSV.read(joinpath(datadir, "$model.csv");
-                                   header = false, transpose = true, delim = ',',
-                                   type = Float64) |> Matrix{Float64}
-                predictions = [rawdata[:, i] for i in axes(rawdata, 2)]
+                rawdata = Array{Float16}(undef, 2313196, 20);
+                read!(joinpath(datadir, "$model.bin"), rawdata) # read data
+
+                rawdata = reshape(rawdata, 2313196 * 20)
+                rawdata = resize!(rawdata, 10000 * 20)
+                rawdata = reshape(rawdata, :, 20)
+
+                predictions = [convert(Array{Float64}, rawdata[i, :]) for i in axes(rawdata, 1)]
 
                 # copy random number generator and set seed
                 _rng = deepcopy(rng)
                 Random.seed!(_rng, 1234)
+
+                labels = resize!(labels, 10000)
 
                 # compute approximations
                 pvalues = calibration_pvalues(_rng, predictions, labels, channel)
