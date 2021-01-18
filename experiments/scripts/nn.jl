@@ -60,6 +60,7 @@ isdir(DATADIR) || mkpath(DATADIR)
 
 # check if predictions exist
 const ALL_MODELS = ["upgrade_v1_c000054", "uncertainty_focal_v1_c000067", "uncertainty_heteroscedastic_c000146", "uncertainty_visibility_c000073"]
+# const ALL_MODELS = ["upgrade_v1_c000054"]
 const MISSING_MODELS = filter(ALL_MODELS) do name
     !isfile(joinpath(DATADIR, "$name.bin"))
 end
@@ -97,7 +98,7 @@ const LABELS = labels
 #' kernel calibration error as well as the unbiased linear estimator for a uniformly scaled
 #' exponential kernel for which the bandwidth is set with the median heuristic.
 
-@everywhere function calibration_errors(rng::AbstractRNG, predictions, labels, channel)
+@everywhere function calibration_errors(rng::AbstractRNG, predictions, labels, kernel, channel)
     # evaluate ECE estimators
     ece_uniform = calibrationerror(ECE(UniformBinning(10)), predictions, labels)
     put!(channel, true)
@@ -105,12 +106,12 @@ const LABELS = labels
     put!(channel, true)
 
     # compute kernel based on the median heuristic
-    kernel = median_TV_kernel(predictions)
+    # kernel = median_TV_kernel(predictions)
 
     # evaluate SKCE estimators
-    skceb_median = calibrationerror(BiasedSKCE(kernel), predictions, labels)
+    # skceb_median = calibrationerror(BiasedSKCE(kernel), predictions, labels)
     put!(channel, true)
-    skceuq_median = calibrationerror(QuadraticUnbiasedSKCE(kernel), predictions, labels)
+    # skceuq_median = calibrationerror(QuadraticUnbiasedSKCE(kernel), predictions, labels)
     put!(channel, true)
     skceul_median = calibrationerror(LinearUnbiasedSKCE(kernel), predictions, labels)
     put!(channel, true)
@@ -118,7 +119,7 @@ const LABELS = labels
     (
         ECE_uniform = ece_uniform,
         ECE_dynamic = ece_dynamic,
-        SKCEb_median = skceb_median,
+        # SKCEb_median = skceb_median,
         SKCEuq_median = skceuq_median,
         SKCEul_median = skceul_median
     )
@@ -160,9 +161,11 @@ else
 
                 # println(axes(rawdata, 1))
                 # println(size(rawdata))
-                rawdata = reshape(rawdata, 2313196 * 20)
-                rawdata = resize!(rawdata, 10000 * 20)
-                rawdata = reshape(rawdata, :, 20)
+                rawdata_t = reshape(rawdata, 2313196 * 20)
+                rawdata_t = resize!(rawdata_t, 10000 * 20)
+                rawdata_t = reshape(rawdata_t, :, 20)
+
+                predictions_t = [convert(Array{Float64}, rawdata_t[i, :]) for i in axes(rawdata_t, 1)]
 
                 predictions = [convert(Array{Float64}, rawdata[i, :]) for i in axes(rawdata, 1)]
                 # println(length(predictions))
@@ -176,10 +179,13 @@ else
                 _rng = deepcopy(rng)
                 Random.seed!(_rng, 1234)
 
-                labels = resize!(labels, 10000)
+                # labels = resize!(labels, 10000)
+
+                # compute kernel based on the median heuristic
+                kernel = median_TV_kernel(predictions_t)
 
                 # compute approximations
-                errors = calibration_errors(_rng, predictions, labels, channel)
+                errors = calibration_errors(_rng, predictions, labels, kernel, channel)
                 merge((model = model,), errors)
             end
         end
