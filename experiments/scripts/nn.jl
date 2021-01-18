@@ -59,7 +59,7 @@ const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_01")
 isdir(DATADIR) || mkpath(DATADIR)
 
 # check if predictions exist
-const ALL_MODELS = ["upgrade_v1_c000054", ]
+const ALL_MODELS = ["upgrade_v1_c000054", "uncertainty_focal_v1_c000067", "uncertainty_heteroscedastic_c000146", "uncertainty_visibility_c000073"]
 const MISSING_MODELS = filter(ALL_MODELS) do name
     !isfile(joinpath(DATADIR, "$name.bin"))
 end
@@ -82,8 +82,8 @@ println(size(labels))
 println(length(labels))
 
 const LABELS = labels
-println("Max")
-println(maximum(LABELS))
+# println("Max")
+# println(maximum(LABELS))
 
 # const LABELS = CSV.read(joinpath(DATADIR, "labels.csv");
 #     header = false, delim = ',', type = Int) |> Matrix{Int} |> vec
@@ -103,9 +103,6 @@ println(maximum(LABELS))
     put!(channel, true)
     ece_dynamic = calibrationerror(ECE(MedianVarianceBinning(100)), predictions, labels)
     put!(channel, true)
-
-    ece_uniform = 0.0
-    ece_dynamic = 0.0
 
     # compute kernel based on the median heuristic
     kernel = median_TV_kernel(predictions)
@@ -161,19 +158,19 @@ else
                 # println(length(rawdata))
                 # predictions = [rawdata[:, i] for i in axes(rawdata, 2)]
 
-                println(axes(rawdata, 1))
-                println(size(rawdata))
+                # println(axes(rawdata, 1))
+                # println(size(rawdata))
                 rawdata = reshape(rawdata, 2313196 * 20)
                 rawdata = resize!(rawdata, 10000 * 20)
                 rawdata = reshape(rawdata, :, 20)
 
                 predictions = [convert(Array{Float64}, rawdata[i, :]) for i in axes(rawdata, 1)]
-                println(length(predictions))
+                # println(length(predictions))
 
-                println(size(rawdata))
-                println(length(rawdata))
-                println(maximum(rawdata))
-                println(minimum(rawdata))
+                # println(size(rawdata))
+                # println(length(rawdata))
+                # println(maximum(rawdata))
+                # println(minimum(rawdata))
 
                 # copy random number generator and set seed
                 _rng = deepcopy(rng)
