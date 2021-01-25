@@ -56,11 +56,15 @@ using LibGit2
 
 # create directory for results
 const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_01")
+# const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_25")
 isdir(DATADIR) || mkpath(DATADIR)
 
+# dl = 55962140
+dl = 2313196
+
 # check if predictions exist
-const ALL_MODELS = ["upgrade_v1_c000054", "uncertainty_focal_v1_c000067", "uncertainty_heteroscedastic_c000146", "uncertainty_visibility_c000073"]
-# const ALL_MODELS = ["upgrade_v1_c000054"]
+# const ALL_MODELS = ["upgrade_v1_c000054", "uncertainty_focal_v1_c000067", "uncertainty_heteroscedastic_c000146", "uncertainty_visibility_c000073"]
+const ALL_MODELS = ["upgrade_v1_c000054"]
 const MISSING_MODELS = filter(ALL_MODELS) do name
     !isfile(joinpath(DATADIR, "$name.bin"))
 end
@@ -77,8 +81,9 @@ end
 
 #' We load the true labels since they are the same for every model.
 
-labels = Array{UInt8}(undef, 2313196);
+labels = Array{UInt8}(undef, dl);
 read!(joinpath(DATADIR, "labels.bin"), labels) # read data
+#' Debug prints
 println(size(labels))
 println(length(labels))
 
@@ -100,25 +105,30 @@ const LABELS = labels
 
 @everywhere function calibration_errors(rng::AbstractRNG, predictions, labels, kernel, channel)
     # evaluate ECE estimators
-    ece_uniform = calibrationerror(ECE(UniformBinning(10)), predictions, labels)
+    println("A")
+    # ece_uniform = calibrationerror(ECE(UniformBinning(10)), predictions, labels)
     put!(channel, true)
-    ece_dynamic = calibrationerror(ECE(MedianVarianceBinning(100)), predictions, labels)
+    println("B")
+    # ece_dynamic = calibrationerror(ECE(MedianVarianceBinning(100)), predictions, labels)
     put!(channel, true)
 
     # compute kernel based on the median heuristic
     # kernel = median_TV_kernel(predictions)
 
     # evaluate SKCE estimators
+    println("C")
     # skceb_median = calibrationerror(BiasedSKCE(kernel), predictions, labels)
     put!(channel, true)
+    println("D")
     # skceuq_median = calibrationerror(QuadraticUnbiasedSKCE(kernel), predictions, labels)
     put!(channel, true)
+    println("E")
     skceul_median = calibrationerror(LinearUnbiasedSKCE(kernel), predictions, labels)
     put!(channel, true)
 
     (
-        ECE_uniform = ece_uniform,
-        ECE_dynamic = ece_dynamic,
+        # ECE_uniform = ece_uniform,
+        # ECE_dynamic = ece_dynamic,
         # SKCEb_median = skceb_median,
         # SKCEuq_median = skceuq_median,
         SKCEul_median = skceul_median
@@ -142,11 +152,11 @@ else
             next!(p)
         end
 
-        # compute the p-value approximations for all models
+        # compute the calibration approximations for all models
         estimates = let rng = Random.GLOBAL_RNG, datadir = DATADIR, labels = LABELS, channel = channel
             pmap(wp, ALL_MODELS) do model
                 # load predictions
-                rawdata = Array{Float16}(undef, 2313196, 20);
+                rawdata = Array{Float16}(undef, dl, 20);
                 read!(joinpath(datadir, "$model.bin"), rawdata) # read data
 
                 
@@ -161,13 +171,15 @@ else
 
                 # println(axes(rawdata, 1))
                 # println(size(rawdata))
-                rawdata_t = reshape(rawdata, 2313196 * 20)
+                rawdata_t = reshape(rawdata, dl * 20)
                 rawdata_t = resize!(rawdata_t, 10000 * 20)
                 rawdata_t = reshape(rawdata_t, :, 20)
 
                 predictions_t = [convert(Array{Float64}, rawdata_t[i, :]) for i in axes(rawdata_t, 1)]
 
+                println("pos A")
                 predictions = [convert(Array{Float64}, rawdata[i, :]) for i in axes(rawdata, 1)]
+                println("pos B")
                 # println(length(predictions))
 
                 # println(size(rawdata))
@@ -206,101 +218,101 @@ end
 # ' the asymptotic approximations for the unbiased quadratic and linear SKCE estimators
 # ' used above. The results are saved in a CSV file `pvalues.csv`.
 
-@everywhere function calibration_pvalues(rng::AbstractRNG, predictions, labels, channel)
-    # evaluate consistency resampling based estimators
-    # ece_uniform = ConsistencyTest(ECE(UniformBinning(10)), predictions, labels)
-    # pvalue_ece_uniform = pvalue(ece_uniform; rng = rng)
-    put!(channel, true)
-    # ece_dynamic = ConsistencyTest(ECE(MedianVarianceBinning(100)), predictions, labels)
-    # pvalue_ece_dynamic = pvalue(ece_dynamic; rng = rng)
-    put!(channel, true)
+# @everywhere function calibration_pvalues(rng::AbstractRNG, predictions, labels, channel)
+#     # evaluate consistency resampling based estimators
+#     # ece_uniform = ConsistencyTest(ECE(UniformBinning(10)), predictions, labels)
+#     # pvalue_ece_uniform = pvalue(ece_uniform; rng = rng)
+#     put!(channel, true)
+#     # ece_dynamic = ConsistencyTest(ECE(MedianVarianceBinning(100)), predictions, labels)
+#     # pvalue_ece_dynamic = pvalue(ece_dynamic; rng = rng)
+#     put!(channel, true)
+# 
+#     # compute kernel based on the median heuristic
+#     kernel = median_TV_kernel(predictions)
+# 
+#     # evaluate distribution-free bounds
+#     # skceb_median_distribution_free = DistributionFreeTest(BiasedSKCE(kernel), predictions, labels)
+#     # pvalue_skceb_median_distribution_free = pvalue(skceb_median_distribution_free)
+#     put!(channel, true)
+#     # skceuq_median_distribution_free = DistributionFreeTest(QuadraticUnbiasedSKCE(kernel), predictions, labels)
+#     # pvalue_skceuq_median_distribution_free = pvalue(skceuq_median_distribution_free)
+#     put!(channel, true)
+#     # skceul_median_distribution_free = DistributionFreeTest(LinearUnbiasedSKCE(kernel), predictions, labels)
+#     # pvalue_skceul_median_distribution_free = pvalue(skceul_median_distribution_free)
+#     put!(channel, true)
+# 
+#     # evaluate asymptotic bounds
+#     # skceuq_median_asymptotic = AsymptoticQuadraticTest(kernel, predictions, labels)
+#     # pvalue_skceuq_median_asymptotic = pvalue(skceuq_median_asymptotic; rng = rng)
+#     put!(channel, true)
+#     skceul_median_asymptotic = AsymptoticLinearTest(kernel, predictions, labels)
+#     pvalue_skceul_median_asymptotic = pvalue(skceul_median_asymptotic)
+#     put!(channel, true)
+# 
+#     (
+#         # ECE_uniform = pvalue_ece_uniform,
+#         # ECE_dynamic = pvalue_ece_dynamic,
+#         # SKCEb_median_distribution_free = pvalue_skceb_median_distribution_free,
+#         # SKCEuq_median_distribution_free = pvalue_skceuq_median_distribution_free,
+#         # SKCEul_median_distribution_free = pvalue_skceul_median_distribution_free,
+#         # SKCEuq_median_asymptotic = pvalue_skceuq_median_asymptotic,
+#         SKCEul_median_asymptotic = pvalue_skceul_median_asymptotic,
+#     )
+# end
 
-    # compute kernel based on the median heuristic
-    kernel = median_TV_kernel(predictions)
-
-    # evaluate distribution-free bounds
-    # skceb_median_distribution_free = DistributionFreeTest(BiasedSKCE(kernel), predictions, labels)
-    # pvalue_skceb_median_distribution_free = pvalue(skceb_median_distribution_free)
-    put!(channel, true)
-    # skceuq_median_distribution_free = DistributionFreeTest(QuadraticUnbiasedSKCE(kernel), predictions, labels)
-    # pvalue_skceuq_median_distribution_free = pvalue(skceuq_median_distribution_free)
-    put!(channel, true)
-    # skceul_median_distribution_free = DistributionFreeTest(LinearUnbiasedSKCE(kernel), predictions, labels)
-    # pvalue_skceul_median_distribution_free = pvalue(skceul_median_distribution_free)
-    put!(channel, true)
-
-    # evaluate asymptotic bounds
-    # skceuq_median_asymptotic = AsymptoticQuadraticTest(kernel, predictions, labels)
-    # pvalue_skceuq_median_asymptotic = pvalue(skceuq_median_asymptotic; rng = rng)
-    put!(channel, true)
-    skceul_median_asymptotic = AsymptoticLinearTest(kernel, predictions, labels)
-    pvalue_skceul_median_asymptotic = pvalue(skceul_median_asymptotic)
-    put!(channel, true)
-
-    (
-        # ECE_uniform = pvalue_ece_uniform,
-        # ECE_dynamic = pvalue_ece_dynamic,
-        # SKCEb_median_distribution_free = pvalue_skceb_median_distribution_free,
-        # SKCEuq_median_distribution_free = pvalue_skceuq_median_distribution_free,
-        # SKCEul_median_distribution_free = pvalue_skceul_median_distribution_free,
-        # SKCEuq_median_asymptotic = pvalue_skceuq_median_asymptotic,
-        SKCEul_median_asymptotic = pvalue_skceul_median_asymptotic,
-    )
-end
-
-# do not recompute the p-values if a file with results exists
-if isfile(joinpath(DATADIR, "pvalues.csv"))
-    @info "skipping p-value approximations: output file $(joinpath(DATADIR, "pvalues.csv")) exists"
-else
-    # define the pool of workers, the progress bar, and its update channel
-    wp = CachingPool(workers())
-    n = length(ALL_MODELS)
-    p = Progress(7 * n, 1, "computing p-value approximations...")
-    channel = RemoteChannel(() -> Channel{Bool}(7 * n))
-
-    local estimates
-    @sync begin
-        # update the progress bar
-        @async while take!(channel)
-            next!(p)
-        end
-
-        # compute the p-value approximations for all models
-        estimates = let rng = Random.GLOBAL_RNG, datadir = DATADIR, labels = LABELS, channel = channel
-            pmap(wp, ALL_MODELS) do model
-                # # load predictions
-                # rawdata = CSV.read(joinpath(datadir, "$model.csv");
-                #                    header = false, transpose = true, delim = ',',
-                #                    type = Float64) |> Matrix{Float64}
-                # predictions = [rawdata[:, i] for i in axes(rawdata, 2)]
-
-                # load predictions
-                rawdata = Array{Float16}(undef, 2313196, 20);
-                read!(joinpath(datadir, "$model.bin"), rawdata) # read data
-
-                rawdata = reshape(rawdata, 2313196 * 20)
-                rawdata = resize!(rawdata, 10000 * 20)
-                rawdata = reshape(rawdata, :, 20)
-
-                predictions = [convert(Array{Float64}, rawdata[i, :]) for i in axes(rawdata, 1)]
-
-                # copy random number generator and set seed
-                _rng = deepcopy(rng)
-                Random.seed!(_rng, 1234)
-
-                labels = resize!(labels, 10000)
-
-                # compute approximations
-                pvalues = calibration_pvalues(_rng, predictions, labels, channel)
-                merge((model = model,), pvalues)
-            end
-        end
-
-        # stop progress bar
-        put!(channel, false)
-    end
-
-    # save estimates
-    @info "saving p-value approximations..."
-    CSV.write(joinpath(DATADIR, "pvalues.csv"), estimates)
-end
+# # do not recompute the p-values if a file with results exists
+# if isfile(joinpath(DATADIR, "pvalues.csv"))
+#     @info "skipping p-value approximations: output file $(joinpath(DATADIR, "pvalues.csv")) exists"
+# else
+#     # define the pool of workers, the progress bar, and its update channel
+#     wp = CachingPool(workers())
+#     n = length(ALL_MODELS)
+#     p = Progress(7 * n, 1, "computing p-value approximations...")
+#     channel = RemoteChannel(() -> Channel{Bool}(7 * n))
+# 
+#     local estimates
+#     @sync begin
+#         # update the progress bar
+#         @async while take!(channel)
+#             next!(p)
+#         end
+# 
+#         # compute the p-value approximations for all models
+#         estimates = let rng = Random.GLOBAL_RNG, datadir = DATADIR, labels = LABELS, channel = channel
+#             pmap(wp, ALL_MODELS) do model
+#                 # # load predictions
+#                 # rawdata = CSV.read(joinpath(datadir, "$model.csv");
+#                 #                    header = false, transpose = true, delim = ',',
+#                 #                    type = Float64) |> Matrix{Float64}
+#                 # predictions = [rawdata[:, i] for i in axes(rawdata, 2)]
+# 
+#                 # load predictions
+#                 rawdata = Array{Float16}(undef, dl, 20);
+#                 read!(joinpath(datadir, "$model.bin"), rawdata) # read data
+# 
+#                 rawdata = reshape(rawdata, dl * 20)
+#                 rawdata = resize!(rawdata, 10000 * 20)
+#                 rawdata = reshape(rawdata, :, 20)
+# 
+#                 predictions = [convert(Array{Float64}, rawdata[i, :]) for i in axes(rawdata, 1)]
+# 
+#                 # copy random number generator and set seed
+#                 _rng = deepcopy(rng)
+#                 Random.seed!(_rng, 1234)
+# 
+#                 labels = resize!(labels, 10000)
+# 
+#                 # compute approximations
+#                 pvalues = calibration_pvalues(_rng, predictions, labels, channel)
+#                 merge((model = model,), pvalues)
+#             end
+#         end
+# 
+#         # stop progress bar
+#         put!(channel, false)
+#     end
+# 
+#     # save estimates
+#     @info "saving p-value approximations..."
+#     CSV.write(joinpath(DATADIR, "pvalues.csv"), estimates)
+# end
