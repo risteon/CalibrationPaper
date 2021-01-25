@@ -55,16 +55,16 @@ using LibGit2
 #' First we check if the predictions and labels are already extracted.
 
 # create directory for results
-const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_01")
-# const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_25")
+# const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_01")
+const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_25")
 isdir(DATADIR) || mkpath(DATADIR)
 
-# dl = 55962140
-dl = 2313196
+dl = 55962140
+# dl = 2313196
 
 # check if predictions exist
-# const ALL_MODELS = ["upgrade_v1_c000054", "uncertainty_focal_v1_c000067", "uncertainty_heteroscedastic_c000146", "uncertainty_visibility_c000073"]
-const ALL_MODELS = ["upgrade_v1_c000054"]
+const ALL_MODELS = ["upgrade_v1_c000054", "uncertainty_focal_v1_c000067", "uncertainty_heteroscedastic_c000146", "uncertainty_visibility_c000073"]
+# const ALL_MODELS = ["upgrade_v1_c000054"]
 const MISSING_MODELS = filter(ALL_MODELS) do name
     !isfile(joinpath(DATADIR, "$name.bin"))
 end
@@ -131,7 +131,7 @@ const LABELS = labels
         # ECE_dynamic = ece_dynamic,
         # SKCEb_median = skceb_median,
         # SKCEuq_median = skceuq_median,
-        SKCEul_median = skceul_median
+        SKCEul_median = skceul_median,
     )
 end
 
