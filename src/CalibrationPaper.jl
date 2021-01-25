@@ -10,7 +10,7 @@ using StatsFuns
 using Statistics
 
 export CalibrationPaperModel
-export median_TV_kernel, mean_TV_kernel
+export median_TV_kernel, mean_TV_kernel, debug_bla
 export collect_estimates
 
 include("model.jl")

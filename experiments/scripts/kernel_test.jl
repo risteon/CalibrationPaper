@@ -91,7 +91,6 @@ const LABELS = labels
 # println("Max")
 # println(maximum(LABELS))
 
-rng = Random.GLOBAL_RNG
 datadir = DATADIR
 labels = LABELS
 
@@ -112,5 +111,8 @@ for model in ALL_MODELS
     println("pos B")
 
     # compute kernel based on the median heuristic
-    kernel = median_TV_kernel(predictions_t)
+    # kernel = median_TV_kernel(predictions_t)
+    γ = debug_bla(predictions_t)
+    
+    println("Gamma:", γ)
 end
