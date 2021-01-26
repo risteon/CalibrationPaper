@@ -90,9 +90,9 @@ read!(joinpath(DATADIR, "labels.bin"), labels) # read data
 println(size(labels))
 println(length(labels))
 
-const LABELS = labels
-# println("Max")
-# println(maximum(LABELS))
+const LABELS = labels + 1
+println("Largest label: ", maximum(LABELS))
+println("Smallest label: ",minimum(LABELS))
 
 # const LABELS = CSV.read(joinpath(DATADIR, "labels.csv");
 #     header = false, delim = ',', type = Int) |> Matrix{Int} |> vec
