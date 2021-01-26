@@ -124,8 +124,8 @@ println("Smallest label: ",minimum(LABELS))
     # skceuq_median_distribution_free = DistributionFreeTest(QuadraticUnbiasedSKCE(kernel), predictions, labels)
     # pvalue_skceuq_median_distribution_free = pvalue(skceuq_median_distribution_free)
     put!(channel, true)
-    # skceul_median_distribution_free = DistributionFreeTest(LinearUnbiasedSKCE(kernel), predictions, labels)
-    # pvalue_skceul_median_distribution_free = pvalue(skceul_median_distribution_free)
+    skceul_median_distribution_free = DistributionFreeTest(LinearUnbiasedSKCE(kernel), predictions, labels)
+    pvalue_skceul_median_distribution_free = pvalue(skceul_median_distribution_free)
     put!(channel, true)
 
     # evaluate asymptotic bounds
@@ -141,7 +141,7 @@ println("Smallest label: ",minimum(LABELS))
         # ECE_dynamic = pvalue_ece_dynamic,
         # SKCEb_median_distribution_free = pvalue_skceb_median_distribution_free,
         # SKCEuq_median_distribution_free = pvalue_skceuq_median_distribution_free,
-        # SKCEul_median_distribution_free = pvalue_skceul_median_distribution_free,
+        SKCEul_median_distribution_free = pvalue_skceul_median_distribution_free,
         # SKCEuq_median_asymptotic = pvalue_skceuq_median_asymptotic,
         SKCEul_median_asymptotic = pvalue_skceul_median_asymptotic,
     )
