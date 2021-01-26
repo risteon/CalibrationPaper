@@ -156,7 +156,7 @@ else
         estimates = let rng = Random.GLOBAL_RNG, datadir = DATADIR, labels = LABELS, channel = channel
             pmap(wp, ALL_MODELS) do model
                 # load predictions
-                rawdata = Array{Float16}(undef, dl, 20);
+                rawdata = Array{Float16}(undef, 20, dl);
                 read!(joinpath(datadir, "$model.bin"), rawdata) # read data
 
                 
@@ -171,14 +171,14 @@ else
 
                 # println(axes(rawdata, 1))
                 # println(size(rawdata))
-                rawdata_t = reshape(rawdata, dl * 20)
-                rawdata_t = resize!(rawdata_t, 10000 * 20)
-                rawdata_t = reshape(rawdata_t, :, 20)
+                # rawdata_t = reshape(rawdata, 20 * dl)
+                # rawdata_t = resize!(rawdata_t, 20 * 10000)
+                # rawdata_t = reshape(rawdata_t, 20, :)
 
-                predictions_t = [convert(Array{Float64}, rawdata_t[i, :]) for i in axes(rawdata_t, 1)]
+                # predictions_t = [convert(Array{Float64}, rawdata_t[:, i]) for i in axes(rawdata_t, 2)]
 
                 println("pos A")
-                predictions = [convert(Array{Float64}, rawdata[i, :]) for i in axes(rawdata, 1)]
+                predictions = [convert(Array{Float64}, rawdata[:, i]) for i in axes(rawdata, 2)]
                 println("pos B")
                 # println(length(predictions))
 
@@ -194,7 +194,10 @@ else
                 # labels = resize!(labels, 10000)
 
                 # compute kernel based on the median heuristic
-                kernel = median_TV_kernel(predictions_t)
+                # kernel = median_TV_kernel(predictions_t)
+                # pre-computed median value
+                γ = inv(0.58795898)
+                kernel = UniformScalingKernel(ExponentialKernel(γ, TotalVariation()))
 
                 # compute approximations
                 errors = calibration_errors(_rng, predictions, labels, kernel, channel)
