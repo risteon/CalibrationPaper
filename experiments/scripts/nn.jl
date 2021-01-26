@@ -29,6 +29,7 @@ end
     using CalibrationErrors
     using CalibrationPaper
     using CalibrationTests
+    using Distances
 
     using DelimitedFiles
     using Random
@@ -57,6 +58,7 @@ using LibGit2
 # create directory for results
 # const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_01")
 const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_25")
+
 isdir(DATADIR) || mkpath(DATADIR)
 
 dl = 55962140
@@ -65,6 +67,7 @@ dl = 55962140
 # check if predictions exist
 const ALL_MODELS = ["upgrade_v1_c000054", "uncertainty_focal_v1_c000067", "uncertainty_heteroscedastic_c000146", "uncertainty_visibility_c000073"]
 # const ALL_MODELS = ["upgrade_v1_c000054"]
+
 const MISSING_MODELS = filter(ALL_MODELS) do name
     !isfile(joinpath(DATADIR, "$name.bin"))
 end
@@ -159,6 +162,9 @@ else
                 rawdata = Array{Float16}(undef, 20, dl);
                 read!(joinpath(datadir, "$model.bin"), rawdata) # read data
 
+                median_value = readdlm(joinpath(datadir, "median_$model.ascii"), '\t', Float64, '\n')
+                median_value = median_value[1]
+                println("Loaded median value: ", median_value)
                 
 
                 # rawdata = CSV.read(joinpath(datadir, "$model.csv");
@@ -196,7 +202,7 @@ else
                 # compute kernel based on the median heuristic
                 # kernel = median_TV_kernel(predictions_t)
                 # pre-computed median value
-                γ = inv(0.58795898)
+                γ = inv(median_value)
                 kernel = UniformScalingKernel(ExponentialKernel(γ, TotalVariation()))
 
                 # compute approximations
