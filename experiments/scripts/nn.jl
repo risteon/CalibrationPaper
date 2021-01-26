@@ -184,7 +184,8 @@ else
                 # predictions_t = [convert(Array{Float64}, rawdata_t[:, i]) for i in axes(rawdata_t, 2)]
 
                 println("pos A")
-                predictions = [convert(Array{Float64}, rawdata[:, i]) for i in axes(rawdata, 2)]
+                # predictions = [convert(Array{Float64}, rawdata[:, i]) for i in axes(rawdata, 2)]
+                predictions = [rawdata[:, i] for i in axes(rawdata, 2)]
                 println("pos B")
                 # println(length(predictions))
 

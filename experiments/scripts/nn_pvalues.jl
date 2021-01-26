@@ -181,7 +181,8 @@ else
                 median_value = median_value[1]
                 println("Loaded median value: ", median_value)
 
-                predictions = [convert(Array{Float64}, rawdata[:, i]) for i in axes(rawdata, 2)]
+                # predictions = [convert(Array{Float64}, rawdata[:, i]) for i in axes(rawdata, 2)]
+                predictions = [rawdata[:, i] for i in axes(rawdata, 2)]
 
                 # copy random number generator and set seed
                 _rng = deepcopy(rng)
