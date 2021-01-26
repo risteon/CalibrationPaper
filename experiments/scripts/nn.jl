@@ -90,7 +90,7 @@ read!(joinpath(DATADIR, "labels.bin"), labels) # read data
 println(size(labels))
 println(length(labels))
 
-const LABELS = labels + 1
+const LABELS = labels .+ 1
 println("Largest label: ", maximum(LABELS))
 println("Smallest label: ",minimum(LABELS))
 
