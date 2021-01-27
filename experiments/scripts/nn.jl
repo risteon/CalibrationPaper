@@ -57,12 +57,14 @@ using LibGit2
 
 # create directory for results
 # const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_01")
-const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_25")
+# const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_25")
+const DATADIR = joinpath(@__DIR__, "..", "data", "scssnet-KITTI_100")
 
 isdir(DATADIR) || mkpath(DATADIR)
 
-dl = 55962140
 # dl = 2313196
+# dl = 55962140
+dl = 212931177
 
 # check if predictions exist
 const ALL_MODELS = ["upgrade_v1_c000054", "uncertainty_focal_v1_c000067", "uncertainty_heteroscedastic_c000146", "uncertainty_visibility_c000073"]
